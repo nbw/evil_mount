@@ -21,21 +21,30 @@ struct Args {
     #[arg(short, long)]
     work_dir: PathBuf,
 
-    /// The directory that will be copied to. Used to initialize source dir
+    /// The directory that will be copied to
     #[arg(short, long)]
     backup_dir: PathBuf,
+
+    // The directory that holds the original source files, defaults to backup_dor
+    #[arg(short, long)]
+    source_dir: PathBuf,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let Args {
-        work_dir,
         backup_dir,
+        source_dir,
+        work_dir,
     } = Args::parse();
 
     // Ensure that source_dir and backup_dir are folders
     if !work_dir.is_dir() {
         return Err(anyhow!("work_dir must be a directory!"));
+    }
+
+    if !source_dir.is_dir() {
+        println!("source_dir flag missing!");
     }
 
     if !backup_dir.is_dir() {
@@ -65,9 +74,13 @@ async fn main() -> Result<()> {
     println!(
         "Initializing {} with the contents of {}...",
         work_dir.display(),
-        backup_dir.display()
+        source_dir.display()
     );
-    for file_info in WalkDir::new(&backup_dir)
+    println!(
+        "Saving backups to {}...",
+        backup_dir.display(),
+    );
+    for file_info in WalkDir::new(&source_dir)
         .follow_links(true)
         .into_iter()
         .filter(|file_info| match file_info {
@@ -78,7 +91,7 @@ async fn main() -> Result<()> {
     {
         let file_info = file_info?;
         let path = file_info.path();
-        copy_to_dst(path.to_path_buf(), backup_dir.clone(), work_dir.clone())
+        copy_to_dst(path.to_path_buf(), source_dir.clone(), work_dir.clone())
             .await
             .map_err(|err| anyhow!("Error copying file for initialization: {err}"))?;
     }
